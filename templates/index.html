@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="id" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulasi Kriptografi Klasik</title>
+  <meta name="description" content="Aplikasi web simulasi Caesar, Vigenere, Affine, Hill, dan Playfair Cipher berbasis Flask.">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg sticky-top glass-nav">
+    <div class="container py-2">
+      <a class="navbar-brand fw-bold tracking" href="#">Kripto<span>Lab</span></a>
+      <div class="d-flex gap-2 align-items-center">
+        <span class="small text-secondary d-none d-sm-inline">Dark/Light Mode</span>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Ubah tema">☾</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-4 py-lg-5">
+    <section class="hero-card reveal">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-7">
+          <span class="eyebrow">Flask • Python • Classical Cryptography</span>
+          <h1 class="display-5 fw-bold mt-3">Aplikasi Web Simulasi Kriptografi Klasik</h1>
+          <p class="lead text-secondary mt-3">
+            Simulasikan Caesar, Vigenère, Affine, Hill, dan Playfair Cipher dengan proses enkripsi dan dekripsi yang transparan.
+          </p>
+          <div class="d-flex flex-wrap gap-2 mt-4">
+            <span class="badge-soft">Step by step</span>
+            <span class="badge-soft">Matriks Hill</span>
+            <span class="badge-soft">Tabel Playfair</span>
+            <span class="badge-soft">History</span>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="terminal-card">
+            <div class="terminal-dots"><span></span><span></span><span></span></div>
+            <code>
+              A=0, B=1, C=2 ... Z=25<br>
+              C = (P + K) mod 26<br>
+              P = K⁻¹ × C mod 26<br>
+              5x5 Playfair Matrix Ready
+            </code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="row g-4 mt-2">
+      <div class="col-lg-5">
+        <section class="panel-card reveal h-100">
+          <h2 class="h4 fw-bold mb-3">Form Simulasi</h2>
+
+          {% if error %}
+          <div class="alert alert-danger rounded-4 border-0" role="alert">{{ error }}</div>
+          {% endif %}
+
+          <form method="post" id="cipherForm" class="needs-validation" novalidate>
+            <div class="mb-3">
+              <label class="form-label">Pilih Algoritma</label>
+              <select class="form-select input-dark" name="algorithm" id="algorithmSelect" required>
+                {% for key, name in algorithms.items() %}
+                <option value="{{ key }}" {% if selected_algorithm == key %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Mode</label>
+              <div class="segmented">
+                <input type="radio" name="mode" id="encrypt" value="encrypt" {% if selected_mode == 'encrypt' %}checked{% endif %}>
+                <label for="encrypt">Enkripsi</label>
+                <input type="radio" name="mode" id="decrypt" value="decrypt" {% if selected_mode == 'decrypt' %}checked{% endif %}>
+                <label for="decrypt">Dekripsi</label>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Teks Input</label>
+              <textarea class="form-control input-dark" name="text" rows="5" placeholder="Masukkan teks yang ingin diproses..." required>{{ form.get('text', '') }}</textarea>
+              <div class="form-text">Caesar, Vigenère, dan Affine mempertahankan spasi serta tanda baca. Hill dan Playfair menormalisasi huruf.</div>
+            </div>
+
+            <div class="key-group" data-key="caesar">
+              <label class="form-label">Shift Caesar</label>
+              <input class="form-control input-dark" type="number" name="caesar_shift" min="1" max="25" value="{{ form.get('caesar_shift', '3') }}">
+              <div class="form-text">Gunakan angka 1 sampai 25.</div>
+            </div>
+
+            <div class="key-group" data-key="vigenere">
+              <label class="form-label">Keyword Vigenère</label>
+              <input class="form-control input-dark" type="text" name="vigenere_key" value="{{ form.get('vigenere_key', 'KUNCI') }}" placeholder="Contoh: KUNCI">
+            </div>
+
+            <div class="row key-group" data-key="affine">
+              <div class="col-6">
+                <label class="form-label">Nilai a</label>
+                <input class="form-control input-dark" type="number" name="affine_a" value="{{ form.get('affine_a', '5') }}">
+              </div>
+              <div class="col-6">
+                <label class="form-label">Nilai b</label>
+                <input class="form-control input-dark" type="number" name="affine_b" value="{{ form.get('affine_b', '8') }}">
+              </div>
+              <div class="form-text mt-2">Nilai a harus relatif prima dengan 26.</div>
+            </div>
+
+            <div class="key-group" data-key="hill">
+              <label class="form-label">Matriks Kunci Hill</label>
+              <textarea class="form-control input-dark font-monospace" name="hill_matrix" rows="3" placeholder="Contoh 2x2:&#10;3 3&#10;2 5">{{ form.get('hill_matrix', '3 3\n2 5') }}</textarea>
+              <div class="form-text">Isi 2x2 atau 3x3. Pisahkan angka dengan spasi, koma, atau baris baru.</div>
+            </div>
+
+            <div class="key-group" data-key="playfair">
+              <label class="form-label">Keyword Playfair</label>
+              <input class="form-control input-dark" type="text" name="playfair_key" value="{{ form.get('playfair_key', 'RAHASIA') }}" placeholder="Contoh: RAHASIA">
+              <div class="form-text">Huruf J akan digabung dengan I.</div>
+            </div>
+
+            <button class="btn btn-primary-modern w-100 mt-4" type="submit">Proses Sekarang</button>
+          </form>
+        </section>
+      </div>
+
+      <div class="col-lg-7">
+        <section class="panel-card reveal min-vh-panel">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h2 class="h4 fw-bold mb-1">Hasil dan Proses</h2>
+              <p class="text-secondary mb-0">Detail rumus, konversi huruf, dan langkah perhitungan.</p>
+            </div>
+          </div>
+
+          {% if result_data %}
+          <div class="result-box mb-4">
+            <span class="small text-secondary">Output</span>
+            <div class="result-text">{{ result_data.result }}</div>
+            <button class="btn btn-sm btn-outline-light rounded-pill mt-3" type="button" data-copy="{{ result_data.result }}">Salin Hasil</button>
+          </div>
+
+          {% if result_data.meta.matrix and result_data.meta.blocks %}
+          <div class="mb-4">
+            <h3 class="h6 text-uppercase text-secondary">Visualisasi Matriks</h3>
+            <div class="d-flex flex-wrap gap-4">
+              <div>
+                <p class="small mb-2">Matriks</p>
+                <div class="matrix-grid size-{{ result_data.meta.matrix|length }}">
+                  {% for row in result_data.meta.matrix %}
+                    {% for cell in row %}<span>{{ cell }}</span>{% endfor %}
+                  {% endfor %}
+                </div>
+              </div>
+              {% if result_data.meta.working_matrix and result_data.meta.working_matrix != result_data.meta.matrix %}
+              <div>
+                <p class="small mb-2">Matriks Invers</p>
+                <div class="matrix-grid size-{{ result_data.meta.working_matrix|length }}">
+                  {% for row in result_data.meta.working_matrix %}
+                    {% for cell in row %}<span>{{ cell }}</span>{% endfor %}
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+
+          {% if result_data.meta.pairs %}
+          <div class="mb-4">
+            <h3 class="h6 text-uppercase text-secondary">Tabel Playfair 5x5</h3>
+            <div class="playfair-grid">
+              {% for row in result_data.meta.matrix %}
+                {% for cell in row %}<span>{{ cell }}</span>{% endfor %}
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          {% if result_data.meta.blocks %}
+          <div class="mb-4">
+            <h3 class="h6 text-uppercase text-secondary">Perhitungan Blok Hill</h3>
+            <div class="accordion custom-accordion" id="hillAccordion">
+              {% for block in result_data.meta.blocks %}
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#block{{ loop.index }}">
+                    Blok {{ block.block }} → {{ block.output_block }}
+                  </button>
+                </h2>
+                <div id="block{{ loop.index }}" class="accordion-collapse collapse" data-bs-parent="#hillAccordion">
+                  <div class="accordion-body">
+                    <p>Vektor input: {{ block.vector }}</p>
+                    <ul class="mb-2">
+                      {% for row in block.calculation %}
+                      <li>{{ row }}</li>
+                      {% endfor %}
+                    </ul>
+                    <p class="mb-0">Vektor output: {{ block.output_vector }}</p>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="steps-list">
+            {% for step in result_data.steps %}
+            <div class="step-item">
+              <span>{{ loop.index }}</span>
+              <p>{{ step }}</p>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="empty-state">
+            <div class="empty-icon">⌁</div>
+            <h3 class="h5 fw-bold">Belum ada hasil</h3>
+            <p class="text-secondary mb-0">Isi form di sebelah kiri, lalu klik proses untuk melihat simulasi.</p>
+          </div>
+          {% endif %}
+        </section>
+      </div>
+    </div>
+
+    <section class="panel-card reveal mt-4">
+      <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+        <div>
+          <h2 class="h4 fw-bold mb-1">Riwayat Enkripsi dan Dekripsi</h2>
+          <p class="text-secondary mb-0">Menyimpan 12 proses terakhir pada sesi browser.</p>
+        </div>
+        <button class="btn btn-outline-light rounded-pill btn-sm" id="clearHistory" type="button">Bersihkan</button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle modern-table">
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>Algoritma</th>
+              <th>Mode</th>
+              <th>Input</th>
+              <th>Output</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in history %}
+            <tr>
+              <td>{{ item.time }}</td>
+              <td>{{ item.algorithm }}</td>
+              <td>{{ item.mode }}</td>
+              <td>{{ item.input }}</td>
+              <td>{{ item.output }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-secondary py-4">Riwayat masih kosong.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="container pb-4 text-center text-secondary small">
+    Dibuat untuk simulasi edukatif kriptografi klasik berbasis Flask.
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
